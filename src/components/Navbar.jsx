@@ -1,6 +1,23 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 
+function getDisplayName(user) {
+  if (!user) return 'Usuario';
+  if (user.name && String(user.name).trim()) return String(user.name).trim();
+  if (user.username && String(user.username).trim()) return String(user.username).trim();
+  if (user.email) return user.email.split('@')[0];
+  return 'Usuario';
+}
+
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return '';
+  const [local, domain] = email.split('@');
+  if (!local) return `******@${domain}`;
+  const visible = local.slice(0, 4);
+  const hiddenCount = Math.max(local.length - 4, 6);
+  return `${visible}${'*'.repeat(hiddenCount)}@${domain}`;
+}
+
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
 
@@ -66,11 +83,13 @@ export default function Navbar() {
 
         {isAuthenticated ? (
           <>
-            <span className="muted" style={{ fontSize: '0.9rem' }}>
-              {user?.email}
+            <span className="muted" style={{ fontSize: '0.9rem', textAlign: 'right', lineHeight: 1.15 }}>
+              <strong style={{ color: 'var(--text)', fontSize: '0.9rem' }}>{getDisplayName(user)}</strong>
+              <br />
+              {maskEmail(user?.email)}
             </span>
             <NavLink to="/" style={linkStyle} end>
-              Tareas
+              Inicio
             </NavLink>
             <button type="button" className="btn btn-ghost" onClick={logout}>
               Salir

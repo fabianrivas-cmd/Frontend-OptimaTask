@@ -4,6 +4,7 @@ const AuthContext = createContext(null);
 
 const STORAGE_KEY = 'optimatask_token';
 const USER_KEY = 'optimatask_user';
+const WELCOME_KEY = 'optimatask_show_welcome';
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(STORAGE_KEY));
@@ -22,6 +23,7 @@ export function AuthProvider({ children }) {
     setUser(nextUser);
     localStorage.setItem(STORAGE_KEY, nextToken);
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+    sessionStorage.setItem(WELCOME_KEY, '1');
   };
 
   const logout = () => {
@@ -38,6 +40,8 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(token),
       loginSession,
       logout,
+      shouldShowWelcome: () => sessionStorage.getItem(WELCOME_KEY) === '1',
+      clearWelcome: () => sessionStorage.removeItem(WELCOME_KEY),
     }),
     [token, user]
   );

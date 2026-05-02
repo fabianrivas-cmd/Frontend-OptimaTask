@@ -49,17 +49,34 @@ export default function HomePage() {
     };
   }, [token]);
 
-  const preview = useMemo(() => {
+  const previewByOwner = useMemo(() => {
     const priorityRank = { high: 0, medium: 1, low: 2 };
-    return [...tasks]
-      .sort((a, b) => {
-        if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        const pa = priorityRank[a.suggestedPriority] ?? 9;
-        const pb = priorityRank[b.suggestedPriority] ?? 9;
-        return pa - pb;
-      })
-      .slice(0, 5);
-  }, [tasks]);
+    const sortTasks = (a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      const pa = priorityRank[a.suggestedPriority] ?? 9;
+      const pb = priorityRank[b.suggestedPriority] ?? 9;
+      return pa - pb;
+    };
+    const byUser = new Map();
+    for (const task of tasks) {
+      const uid = task.userId ?? task.owner?.id;
+      if (uid == null) continue;
+      if (!byUser.has(uid)) byUser.set(uid, []);
+      byUser.get(uid).push(task);
+    }
+    const currentId = user?.id;
+    const sections = [...byUser.entries()].map(([userId, list]) => ({
+      userId,
+      owner: list[0]?.owner,
+      tasks: [...list].sort(sortTasks).slice(0, 5),
+    }));
+    sections.sort((a, b) => {
+      if (a.userId === currentId) return -1;
+      if (b.userId === currentId) return 1;
+      return formatName(a.owner).localeCompare(formatName(b.owner), 'es');
+    });
+    return sections.filter((s) => s.tasks.length > 0);
+  }, [tasks, user?.id]);
 
   return (
     <div className="stack" style={{ gap: '1.25rem' }}>
@@ -114,26 +131,37 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        {!loading && !error && preview.length === 0 ? (
+        {!loading && !error && previewByOwner.length === 0 ? (
           <p className="muted" style={{ margin: 0 }}>
             Aun no hay tareas. Entra al tablero para agregar la primera.
           </p>
         ) : null}
 
-        {!loading && !error && preview.length > 0 ? (
-          <div className="stack" style={{ gap: '0.5rem' }}>
-            {preview.map((task) => (
-              <article key={task.id} className="card" style={{ padding: '0.85rem' }}>
-                <div className="row" style={{ justifyContent: 'space-between' }}>
-                  <strong>{task.title}</strong>
-                  <span className="badge">{task.completed ? 'Completada' : 'Pendiente'}</span>
+        {!loading && !error && previewByOwner.length > 0 ? (
+          <div className="stack" style={{ gap: '1rem' }}>
+            {previewByOwner.map((section) => (
+              <div key={section.userId} className="stack" style={{ gap: '0.5rem' }}>
+                <h3 className="muted" style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600 }}>
+                  {section.userId === user?.id
+                    ? 'Tus tareas'
+                    : `Tareas de ${formatName(section.owner)}`}
+                </h3>
+                <div className="stack" style={{ gap: '0.5rem' }}>
+                  {section.tasks.map((task) => (
+                    <article key={task.id} className="card" style={{ padding: '0.85rem' }}>
+                      <div className="row" style={{ justifyContent: 'space-between' }}>
+                        <strong>{task.title}</strong>
+                        <span className="badge">{task.completed ? 'Completada' : 'Pendiente'}</span>
+                      </div>
+                      {task.description ? (
+                        <p className="muted" style={{ margin: '0.35rem 0 0' }}>
+                          {task.description}
+                        </p>
+                      ) : null}
+                    </article>
+                  ))}
                 </div>
-                {task.description ? (
-                  <p className="muted" style={{ margin: '0.35rem 0 0' }}>
-                    {task.description}
-                  </p>
-                ) : null}
-              </article>
+              </div>
             ))}
           </div>
         ) : null}

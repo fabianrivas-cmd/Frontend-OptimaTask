@@ -9,6 +9,13 @@ import { useAuth } from '../context/AuthContext.jsx';
 import TaskForm from '../components/TaskForm.jsx';
 import TaskCard from '../components/TaskCard.jsx';
 
+function formatName(owner) {
+  if (!owner) return 'usuario';
+  if (owner.name) return owner.name;
+  if (!owner.email) return 'usuario';
+  return owner.email.split('@')[0];
+}
+
 function flashClass(level) {
   switch (level) {
     case 'warning':
@@ -23,7 +30,7 @@ function flashClass(level) {
 }
 
 export default function TasksPage() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +68,28 @@ export default function TasksPage() {
       return String(a.dueDate).localeCompare(String(b.dueDate));
     });
   }, [tasks]);
+
+  const groupedByOwner = useMemo(() => {
+    const byUser = new Map();
+    for (const task of sorted) {
+      const uid = task.userId ?? task.owner?.id;
+      if (uid == null) continue;
+      if (!byUser.has(uid)) byUser.set(uid, []);
+      byUser.get(uid).push(task);
+    }
+    const currentId = user?.id;
+    const sections = [...byUser.entries()].map(([userId, list]) => ({
+      userId,
+      owner: list[0]?.owner,
+      tasks: list,
+    }));
+    sections.sort((a, b) => {
+      if (a.userId === currentId) return -1;
+      if (b.userId === currentId) return 1;
+      return formatName(a.owner).localeCompare(formatName(b.owner), 'es');
+    });
+    return sections.filter((s) => s.tasks.length > 0);
+  }, [sorted, user?.id]);
 
   async function handleCreate(payload) {
     const created = await apiCreateTask(token, payload);
@@ -125,18 +154,30 @@ export default function TasksPage() {
 
       {loading ? (
         <p className="muted">Cargando tareas…</p>
-      ) : sorted.length === 0 ? (
+      ) : groupedByOwner.length === 0 ? (
         <div className="card muted">No hay tareas todavía. Creá la primera arriba.</div>
       ) : (
-        <div className="stack">
-          {sorted.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onEdit={() => setEditing(task)}
-              onToggle={async () => handleUpdate(task.id, { completed: !task.completed })}
-              onDelete={() => handleDelete(task.id)}
-            />
+        <div className="stack" style={{ gap: '1.25rem' }}>
+          {groupedByOwner.map((section) => (
+            <div key={section.userId} className="stack" style={{ gap: '0.75rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.1rem' }}>
+                {section.userId === user?.id
+                  ? 'Mis tareas'
+                  : `Tareas de ${formatName(section.owner)}`}
+              </h2>
+              <div className="stack">
+                {section.tasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    canManage={task.userId === user?.id}
+                    onEdit={() => setEditing(task)}
+                    onToggle={async () => handleUpdate(task.id, { completed: !task.completed })}
+                    onDelete={() => handleDelete(task.id)}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
